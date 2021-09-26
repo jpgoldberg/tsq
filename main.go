@@ -23,9 +23,9 @@ func main() {
 	fresh_tsr := false // do we request a new one or read to a file?
 	write_tsr := false // do we spit out a base64 encoded tsr?
 
-	filename := "find-the-key.txt"
+	filename := "sample/find-the-key.txt"
 	tsa_host := "https://freetsa.org/tsr"
-	tsr_file := "tsr.txt"
+	tsr_file := "sample/tsr.txt"
 
 	var resp []byte
 	if fresh_tsr {
