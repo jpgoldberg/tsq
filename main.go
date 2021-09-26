@@ -3,12 +3,18 @@ package main
 import (
 	"bytes"
 	"crypto"
+	"crypto/x509"
+	"encoding/asn1"
 	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math/big"
 	"net/http"
 	"os"
+	"strings"
+	"time"
 
 	"github.com/digitorus/timestamp"
 )
@@ -99,17 +105,77 @@ func stamp_file(filename string, service string) ([]byte, error) {
 	return resp, nil
 }
 
+// It would be really nice if I could implement String() for timestamp.Timestamp,
+// but go won't let me. So I am literally copying the structure over and giving it
+// a local private name. I am not including the things that we won't need to print
+type myTimestamp struct {
+	HashAlgorithm crypto.Hash
+	HashedMessage []byte
+
+	Time         time.Time
+	Accuracy     time.Duration
+	SerialNumber *big.Int
+	Policy       asn1.ObjectIdentifier
+	// Ordering     bool
+	// Nonce        *big.Int
+	Qualified bool
+
+	Certificates []*x509.Certificate
+
+	AddTSACertificate bool
+
+	// Extensions contains raw X.509 extensions from the Extensions field of the
+	// Time-Stamp. When parsing time-stamps, this can be used to extract
+	// non-critical extensions that are not parsed by this package. When
+	// marshaling time-stamps, the Extensions field is ignored, see
+	// ExtraExtensions.
+	// Extensions []pkix.Extension
+
+	// ExtraExtensions contains extensions to be copied, raw, into any marshaled
+	// Time-Stamp response. Values override any extensions that would otherwise
+	// be produced based on the other fields. The ExtraExtensions field is not
+	// populated when parsing Time-Stamp responses, see Extensions.
+	// ExtraExtensions []pkix.Extension
+}
+
+func (t myTimestamp) String() string {
+	// Don't use the printf %x, as that will strip leading zeros
+	imprint := fmt.Sprintf("%s:\t%s", "Message-imprint", hex.EncodeToString(t.HashedMessage))
+	stampedTime := fmt.Sprintf("%s\t%s", "Time", t.Time)
+	// I don't know why I am not getting a proper hash algorithm here.
+	alg := fmt.Sprintf("%s:\t%s", "hash-algorithm", t.HashAlgorithm)
+	policy := fmt.Sprintf("%s:\t%s", "Policy", t.Policy)
+	sn := fmt.Sprintf("%s:\t%s", "SN", t.SerialNumber)
+
+	return strings.Join([]string{imprint, stampedTime, sn, alg, policy}, "\n")
+}
+
 func tsr_info(tsr []byte) (string, error) {
 
 	tsResp, err := timestamp.ParseResponse(tsr)
 	if err != nil {
 		return "", fmt.Errorf("could not parse: %v", err)
 	}
-
-	s := fmt.Sprintf("Data-hash:\t%x\n", tsResp.HashedMessage)
-	s += fmt.Sprintf("TSA-Policy:\t%v\n", tsResp.Policy)
-	if len(tsResp.Certificates) > 0 {
-		s += fmt.Sprintf("TSA-Org:\t%v\n", tsResp.Certificates[0].Subject.Organization)
+	mt := &myTimestamp{
+		HashedMessage:     tsResp.HashedMessage,
+		Time:              tsResp.Time,
+		Accuracy:          tsResp.Accuracy,
+		SerialNumber:      tsResp.SerialNumber,
+		Policy:            tsResp.Policy,
+		Qualified:         tsResp.Qualified,
+		Certificates:      tsResp.Certificates,
+		AddTSACertificate: tsResp.AddTSACertificate,
 	}
-	return s, nil
+
+	return mt.String(), nil
+
+	/*
+		s := fmt.Sprintf("Data-hash:\t%x\n", mt.HashedMessage)
+		s += fmt.Sprintf("TSA-Policy:\t%v\n", mt.Policy)
+		if len(tsResp.Certificates) > 0 {
+			s += fmt.Sprintf("TSA-Org:\t%v\n", tsResp.Certificates[0].Subject.Organization)
+		}
+		return s, nil
+
+	*/
 }
