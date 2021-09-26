@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/digitorus/timestamp"
+	"github.com/grantae/certinfo"
 )
 
 // ExampleCreateRequest_ParseResponse demonstrates the creation of a time-stamp request, sending
@@ -142,10 +143,14 @@ func (t myTimestamp) String() string {
 	// Don't use the printf %x, as that will strip leading zeros
 	imprint := fmt.Sprintf("%s:\t%s", "Message-imprint", hex.EncodeToString(t.HashedMessage))
 	stampedTime := fmt.Sprintf("%s\t%s", "Time", t.Time)
-	// I don't know why I am not getting a proper hash algorithm here.
 	alg := fmt.Sprintf("%s:\t%s", "hash-algorithm", t.HashAlgorithm)
 	policy := fmt.Sprintf("%s:\t%s", "Policy", t.Policy)
 	sn := fmt.Sprintf("%s:\t%s", "SN", t.SerialNumber)
+
+	certtext := "Certificate not included"
+	if t.AddTSACertificate {
+		certtext, _ = certinfo.CertificateText(t.Certificates[0])
+	}
 
 	rows := []string{
 		imprint,
@@ -153,6 +158,7 @@ func (t myTimestamp) String() string {
 		sn,
 		alg,
 		policy,
+		certtext,
 	}
 	return strings.Join(rows, "\n")
 }
