@@ -7,6 +7,7 @@ import (
 	"encoding/asn1"
 	"encoding/base64"
 	"encoding/hex"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -25,14 +26,42 @@ import (
 // nolint: govet
 func main() {
 
-	// eventually we will use command line arguments to set these
+	var fresh_tsr bool
+	var inspect_tsr bool
+	var tsa_host string
+	var request_cert bool
+	var display_cert bool
+	var tsr_file string
+	var write_tsr bool
 
-	fresh_tsr := false // do we request a new one or read to a file?
-	write_tsr := false // do we spit out a base64 encoded tsr?
+	flag.StringVar(&tsa_host, "url", "https://freetsa.org/tsr", "TS Authority url")
+	flag.BoolVar(&display_cert, "d", false, "Display certificate (if any)")
+	flag.BoolVar(&request_cert, "c", true, "Request authority's certificate")
+	flag.BoolVar(&inspect_tsr, "i", false, "Inspect a response (DER base64 encoded)")
+	flag.StringVar(&tsr_file, "t", "-", "TSR file to inspect")
+	flag.BoolVar(&fresh_tsr, "r", true, "Request a time stamp")
+	flag.BoolVar(&write_tsr, "w", false, "Write response (DER based64 encoded) to standard output")
 
-	filename := "sample/find-the-key.txt"
-	tsa_host := "https://freetsa.org/tsr"
-	tsr_file := "sample/tsr.txt"
+	flag.Usage = func() {
+		fmt.Fprintf(flag.CommandLine.Output(), "Usage:\n\t%s [options] [filename]\n", os.Args[0])
+		flag.PrintDefaults()
+	}
+	flag.Parse()
+
+	// There is optionally a single non-flag argument, which is the file name to be stamped
+	// if it is missing we use standard input.
+
+	var filename string
+	switch flag.NArg() {
+
+	case 0:
+		// should set to stdin, but currently this default for testing
+		filename = "sample/find-the-key.txt" // using this instead of stdin for now
+	case 1:
+		filename = flag.Arg(0)
+	default:
+		flag.Usage()
+	}
 
 	var resp []byte
 	if fresh_tsr {
