@@ -73,18 +73,19 @@ func stamp_file(filename string, service string) ([]byte, error) {
 	}
 	defer file.Close()
 
-	// We are just going to go with sensible defaults here
-	tsq, err := timestamp.CreateRequest(file, &timestamp.RequestOptions{
+	// Someday we may read options from command line.
+	tsq_options := &timestamp.RequestOptions{
 		Hash:         crypto.SHA256,
 		Certificates: true,
-	})
+	}
+	tsq, err := timestamp.CreateRequest(file, tsq_options)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %v", err)
 	}
 
 	tsr, err := http.Post(service, "application/timestamp-query", bytes.NewReader(tsq))
 	if err != nil {
-		return nil, fmt.Errorf("Failed to get response: %v", err)
+		return nil, fmt.Errorf("failed to get response: %v", err)
 	}
 
 	if tsr.StatusCode > 200 {
