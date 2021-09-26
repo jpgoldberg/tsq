@@ -147,7 +147,14 @@ func (t myTimestamp) String() string {
 	policy := fmt.Sprintf("%s:\t%s", "Policy", t.Policy)
 	sn := fmt.Sprintf("%s:\t%s", "SN", t.SerialNumber)
 
-	return strings.Join([]string{imprint, stampedTime, sn, alg, policy}, "\n")
+	rows := []string{
+		imprint,
+		stampedTime,
+		sn,
+		alg,
+		policy,
+	}
+	return strings.Join(rows, "\n")
 }
 
 func tsr_info(tsr []byte) (string, error) {
@@ -158,6 +165,7 @@ func tsr_info(tsr []byte) (string, error) {
 	}
 	mt := &myTimestamp{
 		HashedMessage:     tsResp.HashedMessage,
+		HashAlgorithm:     tsResp.HashAlgorithm,
 		Time:              tsResp.Time,
 		Accuracy:          tsResp.Accuracy,
 		SerialNumber:      tsResp.SerialNumber,
