@@ -1,0 +1,7 @@
+% date
+Sat Sep 25 01:57:13 CDT 2021
+% echo -n "What key's used?"  | \
+openssl enc -aes-128-ecb -a -nopad -K $(openssl rand 16 -hex)
+iPCRg/JAPtQ3Iiw+RmlyPA==
+% date
+Sat Sep 25 01:57:23 CDT 2021
