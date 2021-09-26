@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"math/big"
@@ -64,8 +65,19 @@ func main() {
 	}
 
 	var resp []byte
+	var err error
 	if fresh_tsr {
-		r, err := stamp_file(filename, tsa_host)
+		var input io.Reader
+		if filename == "" {
+			input = os.Stdin
+		} else {
+			input, err = os.Open(filename)
+			if err != nil {
+				log.Fatalf("failed to open file: %v", err)
+			}
+		}
+
+		r, err := stamp_file(input, tsa_host)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -102,12 +114,7 @@ func tsr_from_file(filename string) ([]byte, error) {
 	return tsr, nil
 }
 
-func stamp_file(filename string, service string) ([]byte, error) {
-	file, err := os.Open(filename)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read file: %v", err)
-	}
-	defer file.Close()
+func stamp_file(file io.Reader, service string) ([]byte, error) {
 
 	// Someday we may read options from command line.
 	tsq_options := &timestamp.RequestOptions{
