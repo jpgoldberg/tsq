@@ -44,7 +44,7 @@ func main() {
 	flag.BoolVar(&write_tsr, "w", false, "Write response (DER based64 encoded) to standard output")
 
 	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "Usage:\n\t%s [options] [filename]\n", os.Args[0])
+		fmt.Fprintf(flag.CommandLine.Output(), "Usage:\t%s [options] [filename]\n", os.Args[0])
 		flag.PrintDefaults()
 	}
 	flag.Parse()
@@ -54,17 +54,16 @@ func main() {
 
 	var filename string
 	switch flag.NArg() {
-
 	case 0:
-		// should set to stdin, but currently this default for testing
-		filename = "sample/find-the-key.txt" // using this instead of stdin for now
+		filename = "" // will use stdin
 	case 1:
 		filename = flag.Arg(0)
 	default:
 		flag.Usage()
+		os.Exit(2)
 	}
 
-	var resp []byte
+	var tsr []byte
 	var err error
 	if fresh_tsr {
 		var input io.Reader
@@ -77,24 +76,29 @@ func main() {
 			}
 		}
 
-		r, err := stamp_file(input, tsa_host)
+		tsq_options := &timestamp.RequestOptions{
+			Hash:         crypto.SHA256,
+			Certificates: request_cert,
+		}
+
+		r, err := stamp_file(input, tsa_host, tsq_options)
 		if err != nil {
 			log.Fatal(err)
 		}
-		resp = r
+		tsr = r
 	} else {
 		r, err := tsr_from_file(tsr_file)
 		if err != nil {
 			log.Fatal(err)
 		}
-		resp = r
+		tsr = r
 	}
 
 	if write_tsr {
-		tsr_string := base64.StdEncoding.EncodeToString(resp)
+		tsr_string := base64.StdEncoding.EncodeToString(tsr)
 		fmt.Println(tsr_string)
 	} else {
-		fmt.Println(tsr_info(resp))
+		fmt.Println(tsr_info(tsr, display_cert))
 	}
 
 }
@@ -114,14 +118,9 @@ func tsr_from_file(filename string) ([]byte, error) {
 	return tsr, nil
 }
 
-func stamp_file(file io.Reader, service string) ([]byte, error) {
+func stamp_file(file io.Reader, service string, options *timestamp.RequestOptions) ([]byte, error) {
 
-	// Someday we may read options from command line.
-	tsq_options := &timestamp.RequestOptions{
-		Hash:         crypto.SHA256,
-		Certificates: true,
-	}
-	tsq, err := timestamp.CreateRequest(file, tsq_options)
+	tsq, err := timestamp.CreateRequest(file, options)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %v", err)
 	}
@@ -199,33 +198,23 @@ func (t myTimestamp) String() string {
 	return strings.Join(rows, "\n")
 }
 
-func tsr_info(tsr []byte) (string, error) {
+func tsr_info(tsr []byte, display_cert bool) (string, error) {
 
-	tsResp, err := timestamp.ParseResponse(tsr)
+	t, err := timestamp.ParseResponse(tsr)
 	if err != nil {
 		return "", fmt.Errorf("could not parse: %v", err)
 	}
 	mt := &myTimestamp{
-		HashedMessage:     tsResp.HashedMessage,
-		HashAlgorithm:     tsResp.HashAlgorithm,
-		Time:              tsResp.Time,
-		Accuracy:          tsResp.Accuracy,
-		SerialNumber:      tsResp.SerialNumber,
-		Policy:            tsResp.Policy,
-		Qualified:         tsResp.Qualified,
-		Certificates:      tsResp.Certificates,
-		AddTSACertificate: tsResp.AddTSACertificate,
+		HashedMessage:     t.HashedMessage,
+		HashAlgorithm:     t.HashAlgorithm,
+		Time:              t.Time,
+		Accuracy:          t.Accuracy,
+		SerialNumber:      t.SerialNumber,
+		Policy:            t.Policy,
+		Qualified:         t.Qualified,
+		Certificates:      t.Certificates,
+		AddTSACertificate: t.AddTSACertificate && display_cert,
 	}
 
 	return mt.String(), nil
-
-	/*
-		s := fmt.Sprintf("Data-hash:\t%x\n", mt.HashedMessage)
-		s += fmt.Sprintf("TSA-Policy:\t%v\n", mt.Policy)
-		if len(tsResp.Certificates) > 0 {
-			s += fmt.Sprintf("TSA-Org:\t%v\n", tsResp.Certificates[0].Subject.Organization)
-		}
-		return s, nil
-
-	*/
 }
